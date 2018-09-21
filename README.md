@@ -3,6 +3,8 @@ spawn
 
 A utility package that makes writing end-to-end tests for Go servers easier.
 
+It essentially spawns your program from its [TestMain()](https://golang.org/pkg/testing/#hdr-Main), so that you can interact with it from your tests.
+
 For usage instructions refer to the [examples](examples/).
 
 Rationale
