@@ -1,3 +1,5 @@
+// Package spawn facilitates end-to-end testing Go binaries. Refer to the
+// examples directory for usage information.
 package spawn
 
 import (
@@ -17,7 +19,18 @@ const envPrefix = "SPAWN_"
 
 var envRe = regexp.MustCompile(`\A` + envPrefix + `[[:xdigit:]]{64}=1\z`)
 
-// Cmd represents an external binary being prepared to run.
+// Cmd wraps exec.Cmd and represents a binary being prepared or run.
+//
+// In the typical end-to-end testing scenario, Cmd will end up running
+// two times:
+//
+// 1) from TestMain when the test suite is run (i.e. `go test`). At this
+//    point it will spawn the already-compiled test binary (itself) again
+// 2) from the aforementioned spawned binary, in TestMain again. But this time
+//    it will intercept TestMain and will execute main() instead
+//    (i.e. the actual program)
+//
+// The binary will use os.Stdout and os.Stderr of the caller.
 type Cmd struct {
 	Cmd *exec.Cmd
 
@@ -28,12 +41,12 @@ type Cmd struct {
 	sigErr error
 }
 
-// New returns the command to execute fn() with the given arguments.
-// The command will use os.Stdout and os.Stderr.
-func New(fn func(), args ...string) Cmd {
+// New returns a Cmd that will either execute f() or the parent binary with
+// the given arguments. The program's main() function should be passed as f.
+func New(f func(), args ...string) Cmd {
 	c := Cmd{}
 
-	c.fn = fn
+	c.fn = f
 	c.Cmd = exec.Command(os.Args[0], args...)
 	c.Cmd.Stdout = os.Stdout
 	c.Cmd.Stderr = os.Stderr
