@@ -59,8 +59,8 @@ func New(f func(), args ...string) Cmd {
 	return c
 }
 
-// Start starts c. It does not wait for it to complete. When ctx is complete,
-// a SIGINT will be sent to c.
+// Start starts c until it terminates or ctx is cancelled. It does not wait
+// for it to complete. When ctx is cancelled a SIGINT is sent to c.
 //
 // The Wait method will return the exit code and release associated resources
 // once the command exits.
