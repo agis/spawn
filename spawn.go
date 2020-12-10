@@ -54,7 +54,7 @@ func New(f func(), args ...string) Cmd {
 	h := sha256.New()
 	h.Write([]byte(os.Args[0] + strings.Join(args, "")))
 	c.hash = fmt.Sprintf(envPrefix+"%x", h.Sum(nil))
-	c.Cmd.Env = []string{c.hash + "=1"}
+	c.Cmd.Env = append(os.Environ(), c.hash+"=1")
 
 	return c
 }
