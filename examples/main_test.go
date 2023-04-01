@@ -4,7 +4,6 @@ import (
 	"context"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -14,30 +13,20 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	cmd := spawn.New(main)
-
-	// start server
+	// start the server
+	server := spawn.New(main)
 	ctx, cancel := context.WithCancel(context.Background())
-	err := cmd.Start(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
+	server.Start(ctx)
 
-	// make sure server is up before running the tests
-	for i := 0; i < 3; i++ {
-		conn, err := net.Dial("tcp", ":8080")
-		if err != nil {
-			time.Sleep(500 * time.Millisecond)
-			continue
-		}
-		conn.Close()
-	}
+	// wait a bit for it to become ready
+	time.Sleep(500 * time.Millisecond)
 
+	// execute the test suite
 	result := m.Run()
 
-	// shutdown server
+	// cleanly shutdown server
 	cancel()
-	err = cmd.Wait()
+	err := server.Wait()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,9 +39,9 @@ func TestFoo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer res.Body.Close()
 
 	resBody, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

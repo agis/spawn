@@ -1,62 +1,53 @@
-// Package spawn facilitates end-to-end testing Go binaries. Refer to the
-// examples directory for usage information.
+// Package spawn makes it easy to end-to-end test Go servers. The main idea is
+// that you spin up your server in your TestMain(), use it throughout your tests
+// and shut it down at the end.
+//
+// Refer to the examples directory for usage information.
 package spawn
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
-	"strings"
 	"sync"
 	"syscall"
 )
 
-const envPrefix = "SPAWN_"
-
-var envRe = regexp.MustCompile(`\A` + envPrefix + `[[:xdigit:]]{64}=1\z`)
+// envVar is the environment variable set on the spawned Cmd and is used
+// to hijack TestMain and execute main() instead.
+const envVar = "GOSPAWN_EXEC_MAIN"
 
 // Cmd wraps exec.Cmd and represents a binary being prepared or run.
 //
 // In the typical end-to-end testing scenario, Cmd will end up running
 // two times:
 //
-// 1) from TestMain when the test suite is run (i.e. `go test`). At this
-//    point it will spawn the already-compiled test binary (itself) again
-// 2) from the aforementioned spawned binary, in TestMain again. But this time
-//    it will intercept TestMain and will execute main() instead
-//    (i.e. the actual program)
-//
-// The binary will use os.Stdout and os.Stderr of the caller.
+//  1. from TestMain when the test suite is first executed. At this
+//     point it will spawn the already-compiled test binary (itself) again
+//     and...
+//  2. from the spawned binary, inside TestMain again. But this time it will
+//     intercept TestMain and will execute main() instead (i.e. the actual program)
 type Cmd struct {
-	Cmd *exec.Cmd
-
-	fn   func()
-	hash string
+	Cmd  *exec.Cmd
+	main func()
 
 	mu     sync.Mutex
 	sigErr error
 }
 
-// New returns a Cmd that will either execute f() or the parent binary with
+// New returns a Cmd that will either execute the passed in main() function, or the parent binary with
 // the given arguments. The program's main() function should be passed as f.
-func New(f func(), args ...string) Cmd {
-	c := Cmd{}
+func New(main func(), args ...string) *Cmd {
+	cmd := exec.Command(os.Args[0], args...)
+	cmd.Env = append(os.Environ(), envVar+"=1")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-	c.fn = f
-	c.Cmd = exec.Command(os.Args[0], args...)
-	c.Cmd.Stdout = os.Stdout
-	c.Cmd.Stderr = os.Stderr
-
-	h := sha256.New()
-	h.Write([]byte(os.Args[0] + strings.Join(args, "")))
-	c.hash = fmt.Sprintf(envPrefix+"%x", h.Sum(nil))
-	c.Cmd.Env = append(os.Environ(), c.hash+"=1")
-
-	return c
+	return &Cmd{
+		main: main,
+		Cmd:  cmd,
+	}
 }
 
 // Start starts c until it terminates or ctx is cancelled. It does not wait
@@ -65,15 +56,11 @@ func New(f func(), args ...string) Cmd {
 // The Wait method will return the exit code and release associated resources
 // once the command exits.
 func (c *Cmd) Start(ctx context.Context) error {
-	if os.Getenv(c.hash) != "" {
-		c.fn()
-		os.Exit(0)
-	}
+	if os.Getenv(envVar) == "1" {
+		c.main()
 
-	for _, k := range os.Environ() {
-		if envRe.MatchString(k) {
-			return nil
-		}
+		// we don't want to continue executing in TestMain()
+		os.Exit(0)
 	}
 
 	err := c.Cmd.Start()
