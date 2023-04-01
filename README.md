@@ -10,10 +10,7 @@ so that you can interact with it from your tests.
 
 Usage
 --------------
-For usage instructions refer to the [examples](examples/) and the
-[documentation](https://godoc.org/github.com/agis/spawn).
-
-An example usage in a test for a simple HTTP server can be found below.
+An example usage for [this simple HTTP server](examples/main.go) can be found below.
 The complete runnable example is at [examples](examples/).
 
 ```go
