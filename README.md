@@ -1,12 +1,7 @@
 spawn
 ===============
 
-Spawn makes it super-easy to spin up your Go server inline, inside its test
-suite, for end-to-end testing.
-
-It spawns your program from its [`TestMain`](https://golang.org/pkg/testing/#hdr-Main),
-so that you can interact with it from your tests.
-
+Spawn makes it easy to spin up your Go server right from within its own test suite, for end-to-end testing.
 
 Usage
 --------------
@@ -15,8 +10,8 @@ The complete runnable example is at [examples](examples/).
 
 ```go
 func TestMain(m *testing.M) {
-	// start the server
-	server := spawn.New(main)
+	// start the server on localhost:8080 (we assume it accepts a `--port` argument)
+	server := spawn.New(main, "--port", "8080")
 	ctx, cancel := context.WithCancel(context.Background())
 	server.Start(ctx)
 
@@ -36,22 +31,18 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 
-func TestFoo(t *testing.T) {
-	res, err := http.Get("http://localhost:8080/foo")
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestServerFoo(t *testing.T) {
+	res, _ := http.Get("http://localhost:8080/foo")
 	defer res.Body.Close()
 
-	resBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	resBody, _ := ioutil.ReadAll(res.Body)
 
 	if string(resBody) != "Hello!" {
 		t.Fatalf("expected response to be 'Hello!', got '%s'", resBody)
 	}
 }
+
+// more tests using the server
 ```
 
 Rationale
@@ -64,4 +55,4 @@ Writing an end-to-end test for a server typically involves:
 4) shutting the server down
 5) verify everything went OK (server was closed cleanly etc.)
 
-This package makes this process easy to do from within the tests of the server.
+This package aims to simplify this process.
